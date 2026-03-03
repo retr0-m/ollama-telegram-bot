@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ollama Bot — Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Courier New', monospace;
+      background: #0d1117; color: #c9d1d9;
+      padding: 24px;
+    }
+    h1 { color: #58a6ff; font-size: 1.4rem; margin-bottom: 4px; }
+    .subtitle { color: #8b949e; font-size: 0.8rem; margin-bottom: 24px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; padding: 16px;
+    }
+    .card-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 10px;
+    }
+    .card-name { font-size: 1rem; font-weight: bold; color: #e6edf3; }
+    .badge {
+      font-size: 0.7rem; padding: 2px 8px;
+      border-radius: 12px; font-weight: bold;
+    }
+    .badge-running  { background: #1a4731; color: #3fb950; }
+    .badge-stopped  { background: #3d1c1c; color: #f85149; }
+    .badge-created  { background: #1c2a3d; color: #79c0ff; }
+    .badge-error    { background: #3d1c1c; color: #ffa657; }
+    .badge-ready    { background: #2e3a1c; color: #a8cc77; }
+    .meta { font-size: 0.75rem; color: #8b949e; margin-bottom: 2px; }
+    .meta span { color: #c9d1d9; }
+    .log-block {
+      margin-top: 10px; background: #0d1117;
+      border: 1px solid #21262d; border-radius: 4px;
+      padding: 8px; font-size: 0.72rem;
+      max-height: 120px; overflow-y: auto;
+      white-space: pre-wrap; color: #7ee787;
+    }
+    .empty {
+      color: #8b949e; text-align: center;
+      padding: 48px; font-size: 0.9rem;
+    }
+    .refresh { color: #8b949e; font-size: 0.75rem; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>🤖 Ollama Bot — Project Dashboard</h1>
+  <p class="subtitle" id="updated">Loading...</p>
+  <div class="grid" id="grid"></div>
+  <p class="refresh">Auto-refreshes every 10s</p>
+
+  <script>
+    async function fetchProjects() {
+      const resp = await fetch('/api/projects');
+      return await resp.json();
+    }
+
+    async function fetchLogs(name) {
+      const resp = await fetch(`/api/projects/${name}/logs?lines=20`);
+      const data = await resp.json();
+      return data.log || '';
+    }
+
+    function badgeClass(status) {
+      const map = { running: 'badge-running', stopped: 'badge-stopped',
+                    created: 'badge-created', error: 'badge-error', ready: 'badge-ready' };
+      return map[status] || 'badge-created';
+    }
+
+    async function render() {
+      const projects = await fetchProjects();
+      const grid     = document.getElementById('grid');
+      const names    = Object.keys(projects);
+
+      document.getElementById('updated').textContent =
+        `Last updated: ${new Date().toLocaleTimeString()} — ${names.length} project(s)`;
+
+      if (!names.length) {
+        grid.innerHTML = '<p class="empty">No projects yet. Send /new &lt;name&gt; to the bot to get started.</p>';
+        return;
+      }
+
+      const cards = await Promise.all(names.map(async name => {
+        const p   = projects[name];
+        const log = await fetchLogs(name);
+        return `
+          <div class="card">
+            <div class="card-header">
+              <span class="card-name">${name}</span>
+              <span class="badge ${badgeClass(p.status)}">${p.status || 'unknown'}</span>
+            </div>
+            <div class="meta">Path: <span>${p.path}</span></div>
+            <div class="meta">Port: <span>${p.port || '—'}</span>  PID: <span>${p.pid || '—'}</span></div>
+            <div class="meta">Started: <span>${p.started || '—'}</span></div>
+            ${p.git_url ? `<div class="meta">GitHub: <span><a href="${p.git_url}" style="color:#58a6ff" target="_blank">${p.git_url}</a></span></div>` : ''}
+            ${log ? `<div class="log-block">${log.replace(/</g,'&lt;')}</div>` : ''}
+          </div>`;
+      }));
+      grid.innerHTML = cards.join('');
+    }
+
+    render();
+    setInterval(render, 10000);
+  </script>
+</body>
+</html>

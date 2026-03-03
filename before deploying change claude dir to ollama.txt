@@ -1,3 +1,0 @@
-/home/retr0srv/ollama/ollama_telegram_bot/remember_rules.txt
-/home/retr0srv/ollama/ollama_telegram_bot/bot_learned_rules.txt
-/home/retr0srv/ollama/projects
